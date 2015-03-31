@@ -4,20 +4,15 @@ module Loogie
   class BundleHash
     class << self
 
-      def from_definition(specs)
-        digest = Digest::SHA1.new
-
-        sort_specs(specs).each do |spec|
-          digest << "#{spec.name}/#{spec.version}"
-        end
-
-        digest.hexdigest
+      def from_gems(gems)
+        str = gems.map { |gem_data| gem_str(gem_data) }.sort.join('|')
+        Digest::SHA1.hexdigest(str)
       end
 
       protected
 
-      def sort_specs(specs)
-        specs.sort_by(&:name)
+      def gem_str(gem_data)
+        "#{gem_data['name']}/#{gem_data['version']}"
       end
 
     end

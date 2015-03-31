@@ -1,3 +1,3 @@
-require 'loogie/server'
+require 'loogie'
 
 run Loogie::Server

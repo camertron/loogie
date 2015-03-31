@@ -1,13 +1,15 @@
-require 'bundler'
-
 module Loogie
   class Installer
     class << self
 
-      def install(definition)
-        if definition.missing_specs.size > 0
-          installer = Bundler::Installer.new(nil, definition)
-          installer.run({})
+      def install(specs)
+        specs.map do |spec|
+          case spec['type']
+            when 'rubygems'
+              RubygemInstaller.install(spec)
+            when 'git'
+              GitInstaller.install(spec)
+          end
         end
       end
 

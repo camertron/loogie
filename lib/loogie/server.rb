@@ -1,50 +1,36 @@
 require 'sinatra/base'
-require 'fileutils'
-require 'pry-nav'
+require 'sinatra/streaming'
+require 'json'
 
 module Loogie
   class Server < Sinatra::Application
+
+    helpers Sinatra::Streaming
 
     TAR_PATH = '/data/tars'.tap do |path|
       FileUtils.mkdir_p(path)
     end
 
     post '/gemtar' do
-      gemfile = params.fetch('gemfile')
-      lockfile = params.fetch('lockfile')
+      params = JSON.parse(request.body.read)
+      paths = Installer.install(params['gems'])
 
-      Dir.mktmpdir do |dir|
-        gemfile_path = File.join(dir, 'Gemfile')
-        lockfile_path = File.join(dir, 'Gemfile.lock')
+      hash = BundleHash.from_gems(params['gems'])
+      filename = File.join(TAR_PATH, "#{hash}.tar")
 
-        File.open(gemfile_path, 'w') { |f| f.write(gemfile) }
-        File.open(lockfile_path, 'w') { |f| f.write(lockfile) }
+      if File.exist?(filename)
+        send_file(filename, filename: filename, type: 'Application/octet-stream')
+      else
+        headers('Content-Type' => 'application/octet-stream')
+        streams = [File.open(filename, 'w')]
+        packager = Packager.new(streams)
 
-        binding.pry
-        definition = Bundler::Definition.build(
-          gemfile_path, lockfile_path, false
-        )
-
-        specs = definition.specs
-        Installer.install(definition)
-
-        hash = BundleHash.from_definition(specs)
-        filename = File.join(TAR_PATH, "#{hash}.tar")
-
-        if File.exist?(filename)
-          send_file(filename, filename: filename, type: 'Application/octet-stream')
-        else
-          headers('Content-Type' => 'application/octet-stream')
-
-          stream do |out|
-            streams = [File.open(filename), out]
-            packager = Packager.new(streams)
-
-            specs.each do |spec|
-              packager.write_directory(spec.full_gem_path)
-            end
-          end
+        paths.each do |path|
+          puts "Packaging #{path}"
+          packager.write_directory(path)
         end
+
+        send_file(filename, filename: filename, type: 'Application/octet-stream')
       end
     end
 

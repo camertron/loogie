@@ -28,5 +28,9 @@ module Loogie
       end
 
     end
+
+    def close
+      output_tars.each(&:close)
+    end
   end
 end
